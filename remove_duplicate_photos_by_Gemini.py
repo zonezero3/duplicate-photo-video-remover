@@ -99,8 +99,11 @@ def run_auto_backup():
 
         for f_hash, info_list in files_dict.items():
             if len(info_list) > 1:
-                # Sort by modification time descending (Keep the newest version)
-                info_list.sort(key=lambda x: x['mtime'], reverse=True)
+                # Sort rules:
+                # 1. Keep files NOT in Google Photos (Move Google Photos first)
+                # 2. Keep longer filenames (Move shorter filenames)
+                # Key returns (is_not_google, name_length). True/High values are kept (index 0).
+                info_list.sort(key=lambda x: (not ('Google Photos' in x['path'] or 'Google 포토' in x['path']), len(x['title'])), reverse=True)
                 
                 for i, item in enumerate(info_list):
                     if i > 0: # Move older duplicates (index 1 and beyond)
