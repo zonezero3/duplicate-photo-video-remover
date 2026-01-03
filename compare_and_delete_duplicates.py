@@ -6,20 +6,14 @@ from pathlib import Path
 # --- Configurations ---
 # Path 1: Reference directory (Files here are preserved)
 # Example: "D:/Photos/Original_Backup"
-REFERENCE_DIR = r"D:/Photos/Reference" 
+REFERENCE_DIR = r"D:/사진/사진" 
 
 # Path 2: Target directory to clean (Files here will be deleted if duplicates exist in Path 1)
 # Example: "E:/New_Photos/To_Sort"
-TARGET_DIR = r"D:/Photos/Target_To_Clean"
+TARGET_DIR = r"F:/사진"
 
 # Log file name
 LOG_FILE = "deletion_log.csv"
-
-# List of file extensions to scan (Photos and Videos)
-EXTENSIONS = {
-    '.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tiff', '.webp', '.heic',
-    '.mp4', '.mov', '.avi', '.mkv', '.wmv', '.flv', '.ts'
-}
 
 def get_file_hash(path):
     """Reads file content and generates MD5 hash (for content comparison)."""
@@ -34,13 +28,27 @@ def get_file_hash(path):
         print(f"Hash calculation error ({path}): {e}")
         return None
 
-def find_media_files(directory):
-    """Finds all media files under the specified directory."""
+def find_files(directory):
+    """Finds all files under the specified directory."""
     for root, _, files in os.walk(directory):
         for file in files:
-            ext = Path(file).suffix.lower()
-            if ext in EXTENSIONS:
-                yield os.path.join(root, file)
+            yield os.path.join(root, file)
+
+def remove_empty_folders(directory):
+    """Recursively removes empty folders."""
+    print(">>> Step 3: Removing empty folders...")
+    removed_count = 0
+    for root, dirs, files in os.walk(directory, topdown=False):
+        for name in dirs:
+            path = os.path.join(root, name)
+            try:
+                if not os.listdir(path): # Check if directory is empty
+                    os.rmdir(path)
+                    print(f"[Removed Empty Folder] {path}")
+                    removed_count += 1
+            except Exception as e:
+                print(f"[Error removing folder] {path} : {e}")
+    print(f"\n   -> Removed {removed_count} empty folders.\n")
 
 def main():
     print(">>> Duplicate File Remover (Folder Comparison)")
@@ -57,14 +65,13 @@ def main():
     reference_hashes = {}
     count = 0
     
-    for path in find_media_files(REFERENCE_DIR):
+    for path in find_files(REFERENCE_DIR):
+        print(f"   [Scanning] {path}", end='\r')
         f_hash = get_file_hash(path)
         if f_hash:
             # Store hash as key, path as value (only one instance needed for duplicates)
             reference_hashes[f_hash] = path
             count += 1
-            if count % 100 == 0:
-                print(f"   - {count} files indexed...", end='\r')
     
     print(f"\n   -> Analysis complete for {count} reference files.\n")
 
@@ -79,7 +86,8 @@ def main():
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
 
-        for path in find_media_files(TARGET_DIR):
+        for path in find_files(TARGET_DIR):
+            print(f"   [Scanning] {path}", end='\r')
             f_hash = get_file_hash(path)
             if not f_hash:
                 continue
@@ -106,12 +114,15 @@ def main():
                         'Kept_Original_Path': original_path,
                         'Size_Bytes': file_size
                     })
-                    print(f"[Deleted] {path}")
+                    print(f"[Deleted] {path}" + " " * 50)
                     
                 except Exception as e:
                     print(f"[Delete Failed] {path} : {e}")
 
-    # 3. Result Report
+    # 3. Remove empty folders
+    remove_empty_folders(TARGET_DIR)
+
+    # 4. Result Report
     print("-" * 70)
     print("Task Completed!")
     print(f"- Total deleted files: {len(deleted_files)}")
